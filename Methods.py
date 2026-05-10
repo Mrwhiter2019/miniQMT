@@ -136,7 +136,7 @@ def IsMarketGoingUp():
 def calmacd(df):
     df2 = df
     if len(df2) > 33:
-        dif, dea, hist = MACD(df2['close'].astype(float).values, fastperiod=12, slowperiod=26, signalperiod=9)
+        dif, dea, hist = MACD(df2['close'].astype(float).values, SHORT=12, LONG=26, M=9)
         df3 = pd.DataFrame({'dif': dif[33:], 'dea': dea[33:], 'hist': hist[33:]}, index=df2['date'][33:], columns=['dif', 'dea', 'hist'])
         return df3
 

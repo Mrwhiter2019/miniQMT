@@ -48,7 +48,7 @@ def _reversion(bfq_data, xdxr_data, type_):
         data = pd.concat([bfq_data, info.loc[bfq_data.index[0]: bfq_data.index[-1], ['category']]], axis=1)
         data['if_trade'].fillna(value=0, inplace=True)
 
-        data = data.fillna(method='ffill')
+        data = data.ffill()
         data = pd.concat(
             [data, info.loc[bfq_data.index[0]: bfq_data.index[-1], ['fenhong', 'peigu', 'peigujia', 'songzhuangu']]],
             axis=1)
@@ -118,7 +118,7 @@ def etf_reversion(data, xdxr, adjust='01'):
             data[col] = data[col] / data['suogu']
 
     if adjust.lower() in ['02', 'hfq']:
-        data['suogu'] = data['suogu'].fillna(method='ffill')
+        data['suogu'] = data['suogu'].ffill()
         data['suogu'] = data['suogu'].fillna(1)
 
         for col in ['open', 'high', 'low', 'close']:

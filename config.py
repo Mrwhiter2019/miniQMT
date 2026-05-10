@@ -415,7 +415,7 @@ MONITOR_LOOP_INTERVAL = 3  # 监控循环间隔(秒)
 MONITOR_CALL_TIMEOUT = 8.0  # 监控调用超时(秒) - 增加到8秒,避免QMT API调用超时
 MONITOR_NON_TRADE_SLEEP = 60  # 非交易时段休眠(秒)
 GRID_POSITION_QUERY_TIMEOUT = 5.0  # 网格交易持仓查询超时(秒)
-HISTORY_DATA_DOWNLOAD_TIMEOUT = 5  # 启动时单只股票历史数据下载超时（秒），超时则跳过
+HISTORY_DATA_DOWNLOAD_TIMEOUT = 5000  # 启动时单只股票历史数据下载超时（秒），超时则跳过
 GRID_LOCK_ACQUIRE_TIMEOUT = 5.0   # 网格交易锁获取超时(秒)
 
 def is_trade_time():

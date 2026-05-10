@@ -9,6 +9,9 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 # ── 账号专属配置预处理（必须在 import config 之前执行）──
 # 支持命令行: python main.py --account-id 25105132
 _argv = sys.argv[1:]

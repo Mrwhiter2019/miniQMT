@@ -476,7 +476,7 @@ class DataManager:
             )
             executor.shutdown(wait=False)  # 不等待线程，让其在后台独立结束
             try:
-                df = future.result(timeout=10.0)  # 10秒超时（历史数据可以稍长）
+                df = future.result(timeout=5000.0)  # 10秒超时（历史数据可以稍长）
             except concurrent.futures.TimeoutError:
                 logger.warning(f"Mootdx: 下载 {stock_code} 历史数据超时（10秒）")
                 return None
@@ -625,7 +625,7 @@ class DataManager:
             try:
                 result = future.result(timeout=10.0)  # 10秒超时
             except concurrent.futures.TimeoutError:
-                logger.warning(f"xtquant: 获取 {xt_stock_code} 历史数据超时（10秒）")
+                logger.warning(f"xtquant: 获取 {xt_stock_code} 历史数据超时（20秒）")
                 return None
             except RuntimeError as e:
                 if "interpreter shutdown" in str(e).lower() or "shutdown" in str(e).lower():
