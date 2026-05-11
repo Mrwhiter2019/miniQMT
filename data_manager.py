@@ -7,7 +7,8 @@ import sqlite3
 import time
 from datetime import datetime, timedelta
 import threading
-import xtquant.xtdata as xt
+# import xtquant.xtdata as xt  # 移至 _create_xtdata 内部动态加载
+import sys
 import Methods
 import config
 from logger import get_logger, suppress_stdout_stderr
@@ -37,8 +38,37 @@ def _create_xtdata():
         )
         return XtDataAdapter(client)
     else:
-        import xtquant.xtdata as _xtdata
-        return _xtdata
+        try:
+            # 尝试从本地目录或系统环境导入
+            import xtquant.xtdata as _xtdata
+            return _xtdata
+        except ImportError as e:
+            # 如果本地 xtquant 导入失败（通常是缺少当前 Python 版本的 .pyd），尝试强制从 site-packages 导入
+            logger.warning(f"xtquant 导入失败: {e}，尝试从系统环境导入...")
+            
+            # 记录原始路径
+            original_path = sys.path[:]
+            # 尝试临时移除当前工作目录，迫使 Python 在 site-packages 中查找
+            cwd = os.getcwd()
+            if cwd in sys.path:
+                sys.path.remove(cwd)
+            
+            try:
+                # 重新尝试导入
+                if 'xtquant' in sys.modules:
+                    del sys.modules['xtquant']
+                if 'xtquant.xtdata' in sys.modules:
+                    del sys.modules['xtquant.xtdata']
+                
+                import xtquant.xtdata as _xtdata
+                logger.info("成功从系统环境加载 xtquant 库")
+                return _xtdata
+            except Exception as e2:
+                logger.error(f"从系统环境加载 xtquant 失败: {e2}")
+                return None
+            finally:
+                # 还原路径
+                sys.path[:] = original_path
 
 class DataManager:
     """数据管理类，处理历史行情数据的获取与存储"""
@@ -417,8 +447,8 @@ class DataManager:
         返回:
         pandas.DataFrame: 历史数据，若失败则返回None
         """
-        # ── XtQuantManager 模式：通过 HTTP API 下载，跳过 Mootdx ──
-        if getattr(config, 'ENABLE_XTQUANT_MANAGER', False) and self.xt:
+        # ── 优先使用 XtQuant 获取数据 (本地或 XtQuantManager 模式) ──
+        if (getattr(config, 'ENABLE_XTQUANT_MANAGER', False) or getattr(config, 'USE_XTQUANT_FOR_HISTORY', False)) and self.xt:
             # 将 Mootdx period 格式映射到 xtdata period 格式
             _period_map = {
                 'day': '1d', 'week': '1w', 'mon': '1mon',
@@ -430,6 +460,8 @@ class DataManager:
             if not start_date:
                 from datetime import timedelta
                 start_date = (datetime.now() - timedelta(days=90)).strftime('%Y%m%d')
+            
+            logger.debug(f"通过 XtQuant 接口下载 {stock_code} 历史数据")
             return self.download_history_xtdata(
                 stock_code,
                 period=xt_period,
@@ -650,19 +682,39 @@ class DataManager:
                     return None
             
             # 确保日期列格式正确
+            # 修复 1970-01-01 问题：xtdata 的 get_market_data_ex 返回的 DataFrame 索引通常是正确的日期
+            if not df.empty:
+                # 检查索引是否为 YYYYMMDD 格式的字符串或数字
+                first_idx = str(df.index[0])
+                if (len(first_idx) == 8 or len(first_idx) == 14) and first_idx.isdigit():
+                    df['date'] = df.index
+                elif 'time' in df.columns:
+                    df['date'] = df['time']
+            
             if 'date' in df.columns:
                 try:
-                    df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                    # 处理可能的时间戳或字符串
+                    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                    # 如果转换后出现 NaT 或 1970-01-01，且索引有效，则回退到索引
+                    if df['date'].iloc[0].year == 1970 or pd.isna(df['date'].iloc[0]):
+                        first_idx = str(df.index[0])
+                        if (len(first_idx) == 8 or len(first_idx) == 14) and first_idx.isdigit():
+                            df['date'] = pd.to_datetime(df.index)
+                    
+                    df['date'] = df['date'].dt.strftime('%Y-%m-%d')
                 except Exception as e:
                     logger.warning(f"转换日期格式失败: {str(e)}")
-            elif 'time' in df.columns:
-                try:
-                    df = df.rename(columns={'time': 'date'})
-                    df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                except Exception as e:
-                    logger.warning(f"转换time列为日期格式失败: {str(e)}")
             
             if not df.empty:
+                # 舍入处理，避免浮点数精度问题 (如 7.930000000000001)
+                price_cols = ['open', 'high', 'low', 'close', 'preClose', 'settelementPrice']
+                for col in price_cols:
+                    if col in df.columns:
+                        try:
+                            df[col] = df[col].astype(float).round(3)
+                        except:
+                            pass
+                
                 logger.info(f"成功下载 {xt_stock_code} 的历史数据, 共 {len(df)} 条记录")
                 return df
             else:

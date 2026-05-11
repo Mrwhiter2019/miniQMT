@@ -1,13 +1,10 @@
 #coding:utf-8
 
-import os, sys
-import ctypes as ct
-
-import json
-from . import xtbson as bson
+from . import xtbson as _BSON_
 
 
 def read_from_bson_buffer(buffer):
+    import ctypes as ct
     result = []
 
     pos = 0
@@ -23,7 +20,7 @@ def read_from_bson_buffer(buffer):
                 data_buf = buffer[pos : pos + dlen]
                 pos += dlen
 
-                result.append(bson.decode(data_buf))
+                result.append(_BSON_.decode(data_buf))
             except Exception as e:
                 pass
         else:
@@ -36,7 +33,7 @@ def write_to_bson_buffer(data_list):
     buffer = b''
 
     for data in data_list:
-        buffer += bson.encode(data)
+        buffer += _BSON_.encode(data)
 
     return buffer
 

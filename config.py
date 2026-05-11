@@ -80,6 +80,7 @@ INITIAL_DAYS = 365
 UPDATE_INTERVAL = 60
 # 备选池股票文件路径
 STOCK2BUY_FILE = os.path.join(DATA_DIR, "stock2buy.json")
+USE_XTQUANT_FOR_HISTORY = True      # 是否优先从QMT客户端下载历史数据
 
 # 实时数据源配置
 REALTIME_DATA_CONFIG = {

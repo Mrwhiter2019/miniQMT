@@ -471,6 +471,36 @@
                 },
             },
         },
+    u"1830" : {
+        u"desc" : u"ETF统计数据L2",
+        u"periods" : [0],
+        u"fields" : {
+            u"0" : {
+                u"desc" : u"申购笔数",
+                u"type" : u"int",
+                },
+            u"1" : {
+                u"desc" : u"申购数量",
+                u"type" : u"double",
+                },
+            u"2" : {
+                u"desc" : u"申购金额",
+                u"type" : u"double",
+                },
+            u"3" : {
+                u"desc" : u"赎回笔数",
+                u"type" : u"int",
+                },
+            u"4" : {
+                u"desc" : u"赎回数量",
+                u"type" : u"double",
+                },
+            u"5" : {
+                u"desc" : u"赎回金额",
+                u"type" : u"double",
+                },
+            },
+        },
     u"2" : {
         u"desc" : u"市场交易日信息",
         u"periods" : [86400000],
@@ -1195,6 +1225,14 @@
         u"desc" : u"板块成分股变动历史",
         u"periods" : [86400000],
         u"fields" : {
+            u"0" : {
+                u"desc" : u"调入成份股",
+                u"type" : u"string",
+                },
+            u"1" : {
+                u"desc" : u"调出成份股",
+                u"type" : u"string",
+                },
             },
         },
     u"2013" : {
@@ -1421,6 +1459,20 @@
                 },
             u"e" : {
                 u"desc" : u"分红年度",
+                },
+            },
+        },
+    u"2032" : {
+        u"desc" : u"国债收益率",
+        u"periods" : [86400000],
+        u"fields" : {
+            u"0" : {
+                u"desc" : u"10年期收益率",
+                u"type" : u"double",
+                },
+            u"1" : {
+                u"desc" : u"1年期收益率",
+                u"type" : u"double",
                 },
             },
         },
@@ -1673,35 +1725,35 @@
                 u"type" : u"double",
                 },
             u"y" : {
-                u"desc" : u"1分钟涨速",
+                u"desc" : u"1分钟涨速(%)",
                 u"type" : u"double",
                 },
             u"x" : {
-                u"desc" : u"5分钟涨速",
+                u"desc" : u"5分钟涨速(%)",
                 u"type" : u"double",
                 },
             u"w" : {
-                u"desc" : u"3日涨幅",
+                u"desc" : u"3日涨幅(%)",
                 u"type" : u"double",
                 },
             u"v" : {
-                u"desc" : u"5日涨幅",
+                u"desc" : u"5日涨幅(%)",
                 u"type" : u"double",
                 },
             u"u" : {
-                u"desc" : u"10日涨幅",
+                u"desc" : u"10日涨幅(%)",
                 u"type" : u"double",
                 },
             u"t" : {
-                u"desc" : u"3日换手",
+                u"desc" : u"3日换手(%)",
                 u"type" : u"double",
                 },
             u"s" : {
-                u"desc" : u"5日换手",
+                u"desc" : u"5日换手(%)",
                 u"type" : u"double",
                 },
             u"r" : {
-                u"desc" : u"10日换手",
+                u"desc" : u"10日换手(%)",
                 u"type" : u"double",
                 },
             },
@@ -1817,6 +1869,36 @@
             u"f" : {
                 u"desc" : u"SGT南向当日资金余额",
                 u"type" : u"long",
+                },
+            },
+        },
+    u"3030" : {
+        u"desc" : u"ETF统计数据",
+        u"periods" : [0],
+        u"fields" : {
+            u"0" : {
+                u"desc" : u"申购笔数",
+                u"type" : u"int",
+                },
+            u"1" : {
+                u"desc" : u"申购数量",
+                u"type" : u"double",
+                },
+            u"2" : {
+                u"desc" : u"申购金额",
+                u"type" : u"double",
+                },
+            u"3" : {
+                u"desc" : u"赎回笔数",
+                u"type" : u"int",
+                },
+            u"4" : {
+                u"desc" : u"赎回数量",
+                u"type" : u"double",
+                },
+            u"5" : {
+                u"desc" : u"赎回金额",
+                u"type" : u"double",
                 },
             },
         },
@@ -2595,11 +2677,19 @@
             u"33" : {
                 u"desc" : u"合约在交易所的代码", 
                 u"type" : u"string",
-                },   
+                },
             u"150" : {
-                u"desc" : u"期货统一规则代码", 
+                u"desc" : u"期货统一规则代码",
                 u"type" : u"string",
-                },   
+                },
+            u"151" : {
+                u"desc" : u"次主力合约代码",
+                u"type" : u"string",
+                },
+            u"152" : {
+                u"desc" : u"次主力统一规则编码",
+                u"type" : u"string",
+                },
             u"S" : {
                 u"desc" : u"主力合约代码",
                 u"type" : u"string",
@@ -2861,6 +2951,10 @@
                 u"desc" : u"级别",
                 u"type" : u"int",
                 },
+            u"7" : {
+                u"desc" : u"类型 0-其他 1-财报类",
+                u"type" : u"int",
+                },
             },
         },
         u"9502" : {
@@ -2914,6 +3008,10 @@
             u"11" : {
                 u"desc" : u"期权名称",
                 u"type" : u"string",
+                },
+            u"12" : {
+                u"desc" : u"合约单位",
+                u"type" : u"int",
                 },
             },
         },

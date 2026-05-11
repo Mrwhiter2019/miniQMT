@@ -1,18 +1,8 @@
 #coding:utf-8
-import time
-
-import pandas as pd
-
-from . import contextinfo
-from . import functions
-
-import os
-import uuid
-import datetime as dt
 
 from xtquant import xtdata
-from xtquant import xtbson as bson
-from xtquant import xtdata_config
+from xtquant import xtbson as _BSON_
+
 
 class StrategyLoader:
     def __init__(this):
@@ -21,12 +11,17 @@ class StrategyLoader:
         return
 
     def init(this):
+        import os, uuid
+        from xtquant import xtdata_config
+
         C = this.C
 
         C.guid = C._param.get('guid', str(uuid.uuid4()))
-        C.request_id = C._param.get('requestid', C.guid)
+        C.request_id = C._param.get('requestid', '') + "_" + C.guid
         C.quote_mode = C._param.get('quote_mode', 'history') #'realtime' 'history' 'all'
         C.trade_mode = C._param.get('trade_mode', 'backtest') #'simulation' 'trading' 'backtest'
+        C.do_back_test = 1 if C.trade_mode == 'backtest' else 0
+
         C.title = C._param.get('title', '')
         if not C.title:
             C.title = os.path.basename(os.path.abspath(C.user_script).replace('.py', ''))
@@ -56,14 +51,38 @@ class StrategyLoader:
             }.get(C.period, '')
         C.dividend_type = C._param.get('dividend_type', 'none')
 
+        backtest = C._param.get('backtest', {})
+        if backtest:
+            C.asset = backtest.get('asset', 1000000.0)
+            C.margin_ratio = backtest.get('margin_ratio', 0.05)
+            C.slippage_type = backtest.get('slippage_type', 2)
+            C.slippage = backtest.get('slippage', 0.0)
+            C.max_vol_rate = backtest.get('max_vol_rate', 0.0)
+            C.comsisson_type = backtest.get('comsisson_type', 0)
+            C.open_tax = backtest.get('open_tax', 0.0)
+            C.close_tax = backtest.get('close_tax', 0.0)
+            C.min_commission = backtest.get('min_commission', 0.0)
+            C.open_commission = backtest.get('open_commission', 0.0)
+            C.close_commission = backtest.get('close_commission', 0.0)
+            C.close_today_commission = backtest.get('close_today_commission', 0.0)
+            C.benchmark = backtest.get('benchmark', '000300.SH')
+
         xtdata_config.client_guid = C._param.get('clientguid')
+
+        from .functions import datetime_to_timetag
 
         if C.start_time:
             C.start_time_str = C.start_time.replace('-', '').replace(' ', '').replace(':', '')
-            C.start_time_num = int(functions.datetime_to_timetag(C.start_time_str))
+            try:
+                C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+            except:
+                C.start_time_num = 0
         if C.end_time:
             C.end_time_str = C.end_time.replace('-', '').replace(' ', '').replace(':', '')
-            C.end_time_num = int(functions.datetime_to_timetag(C.end_time_str))
+            try:
+                C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+            except:
+                C.end_time_num = 0
 
         if 1: #register
             this.create_formula()
@@ -109,9 +128,21 @@ class StrategyLoader:
                 , 'close_today_commission', 'benchmark'
             ]
             init_result['backtest'] = {ar: C.__getattribute__(ar) for ar in backtest_ar}
+
+            import datetime as dt
             if C.start_time:
+                C.start_time_str = C.start_time.replace('-', '').replace(' ', '').replace(':', '')
+                try:
+                    C.start_time_num = int(datetime_to_timetag(C.start_time_str))
+                except:
+                    C.start_time_num = 0
                 init_result['backtest']['start_time'] = dt.datetime.fromtimestamp(C.start_time_num / 1000).strftime('%Y-%m-%d %H:%M:%S')
             if C.end_time:
+                C.end_time_str = C.end_time.replace('-', '').replace(' ', '').replace(':', '')
+                try:
+                    C.end_time_num = int(datetime_to_timetag(C.end_time_str))
+                except:
+                    C.end_time_num = 0
                 init_result['backtest']['end_time'] = dt.datetime.fromtimestamp(C.end_time_num / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
             this.call_formula('initcomplete', init_result)
@@ -124,6 +155,7 @@ class StrategyLoader:
         return
 
     def start(this):
+        import time
         C = this.C
 
         if C.quote_mode in ['history', 'all']:
@@ -193,16 +225,30 @@ class StrategyLoader:
         C = this.C
 
         push_timelist = []
+        bar_timelist = []
+
         for i in range(max(C.lastrunbarpos, 0), len(C.timelist)):
             C.barpos = i
             bartime = C.timelist[i]
+
             push_timelist.append(bartime)
+            bar_timelist.append(bartime)
 
-            this.call_formula('runbar', {'timelist': [bartime]})
+            if (
+                not C.start_time_num or C.start_time_num <= bartime
+            ) and (
+                not C.end_time_num or bartime <= C.end_time_num
+            ):
+                this.call_formula('runbar', {'timelist': bar_timelist})
+                bar_timelist = []
 
-            if (not C.start_time_num or C.start_time_num <= bartime) and (not C.end_time_num or bartime <= C.end_time_num):
                 C.handlebar()
+
             C.lastrunbarpos = i
+
+        if bar_timelist:
+            this.call_formula('runbar', {'timelist': bar_timelist})
+            bar_timelist = []
 
         if 1:
             push_result = {}
@@ -221,21 +267,23 @@ class StrategyLoader:
             , 'starttime': C.start_time_str, 'endtime': C.end_time_str, 'count': 1
             , 'dividendtype': C.dividend_type, 'create': True, 'pyrunmode': 1
             , 'title': C.title
+            , 'historycallback': 1 if callback else 0
+            , 'realtimecallback': 1 if callback else 0
         }
 
-        client.subscribeFormula(C.request_id, bson.BSON.encode(data), callback)
+        client.subscribeFormula(C.request_id, _BSON_.BSON.encode(data), callback)
 
     def call_formula(this, func, data):
         C = this.C
         client = xtdata.get_client()
-        bresult = client.callFormula(C.request_id, func, bson.BSON.encode(data))
-        return bson.BSON.decode(bresult)
+        bresult = client.callFormula(C.request_id, func, _BSON_.BSON.encode(data))
+        return _BSON_.BSON.decode(bresult)
 
     def create_view(this, title):
         C = this.C
         client = xtdata.get_client()
         data = {'viewtype': 0,'title':title, 'groupid':-1,'stockcode':C.market + C.stockcode,'period':C.period,'dividendtype':C.dividend_type}
-        client.createView(C.request_id, bson.BSON.encode(data))
+        client.createView(C.request_id, _BSON_.BSON.encode(data))
         return
 
 
@@ -244,8 +292,11 @@ class BackTestResult:
         self.request_id = request_id
 
     def get_backtest_index(self):
+        import os, pandas as pd, uuid
+        from .functions import get_backtest_index
+
         path = f'{os.getenv("TEMP")}/backtest_{uuid.uuid4()}'
-        functions.get_backtest_index(self.request_id, path)
+        get_backtest_index(self.request_id, path)
 
         ret = pd.read_csv(f'{path}/backtestindex.csv', encoding = 'utf-8')
         import shutil
@@ -253,8 +304,11 @@ class BackTestResult:
         return ret
 
     def get_group_result(self, fields = []):
+        import os, pandas as pd, uuid
+        from .functions import get_group_result
+
         path = f'{os.getenv("TEMP")}/backtest_{uuid.uuid4()}'
-        functions.get_group_result(self.request_id, path, fields)
+        get_group_result(self.request_id, path, fields)
         if not fields:
             fields = ['order', 'deal', 'position']
         res = {}

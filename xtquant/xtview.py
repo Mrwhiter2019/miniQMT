@@ -1,11 +1,6 @@
 #coding:utf-8
 
-import os, sys
-import datetime as dt
-import traceback
-import json
-
-from . import xtbson as bson, xtutil
+from . import xtbson as _BSON_
 
 ### connection
 
@@ -25,20 +20,30 @@ def connect(ip = '', port = None, remember_if_success = True):
 
     from . import xtconn
 
+    start_port = 0
+    end_port = 65535
+
+    if isinstance(port, tuple):
+        start_port = port[0]
+        end_port = port[1]
+
+    if start_port > end_port:
+        start_port, end_port = end_port, start_port
+
     if not ip:
         ip = 'localhost'
 
     if port:
         server_list = [f'{ip}:{port}']
-        __client = xtconn.connect_any(server_list)
+        __client = xtconn.connect_any(server_list, start_port, end_port)
     else:
-        server_list = xtconn.scan_available_server()
+        server_list = xtconn.scan_available_server_addr()
 
         default_addr = 'localhost:58610'
         if not default_addr in server_list:
             server_list.append(default_addr)
 
-        __client = xtconn.connect_any(server_list)
+        __client = xtconn.connect_any(server_list, start_port, end_port)
 
     if not __client or not __client.is_connected():
         raise Exception("无法连接xtquant服务，请检查QMT-投研版或QMT-极简版是否开启")
@@ -74,6 +79,9 @@ def get_client():
 
 ### utils
 def try_except(func):
+    import sys
+    import traceback
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -91,8 +99,8 @@ def try_except(func):
 
     return wrapper
 
-def __bsoncall_common(interface, func, param):
-    return bson.BSON.decode(interface(func, bson.BSON.encode(param)))
+def _BSON_call_common(interface, func, param):
+    return _BSON_.BSON.decode(interface(func, _BSON_.BSON.encode(param)))
 
 def create_view(viewID, view_type, title, group_id):
     client = get_client()
@@ -119,13 +127,13 @@ def push_view_data(viewID, datas):
     datas: { "timetags: [t1, t2, ...], "outputs": { "output1": [value1, value2, ...], ... }, "overwrite": "full/increase" }
     '''
     client = get_client()
-    bresult = client.pushViewData(viewID, 'index', bson.BSON.encode(datas))
-    return bson.BSON.decode(bresult)
+    bresult = client.pushViewData(viewID, 'index', _BSON_.BSON.encode(datas))
+    return _BSON_.BSON.decode(bresult)
 
 def switch_graph_view(stock_code = None, period = None, dividendtype = None, graphtype = None):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'switchgraphview'
         , {
             "stockcode": stock_code
@@ -170,7 +178,7 @@ def add_schedule(schedule_name, begin_time = '', finish_time = '', interval = 60
 
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'addschedule'
         , {
             'name': schedule_name
@@ -223,7 +231,7 @@ def add_schedule_download_task(schedule_name, stock_code = [], period = '', rece
 
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'addscheduledownloadtask'
         , {
             'name': schedule_name
@@ -241,7 +249,7 @@ def add_schedule_download_task(schedule_name, stock_code = [], period = '', rece
 def modify_schedule_task(schedule_name, begin_time = '', finish_time = '', interval = 60, run = False, only_work_date = False, always_run = False):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'modifyschedule'
         , {
             'name': schedule_name
@@ -257,7 +265,7 @@ def modify_schedule_task(schedule_name, begin_time = '', finish_time = '', inter
 def remove_schedule(schedule_name):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'removeschedule'
         , {
             'name': schedule_name
@@ -268,7 +276,7 @@ def remove_schedule(schedule_name):
 def remove_schedule_download_task(schedule_name, task_id):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'removescheduledownloadtask'
         , {
             'name': schedule_name
@@ -280,7 +288,7 @@ def remove_schedule_download_task(schedule_name, task_id):
 def query_schedule_task():
     cl = get_client()
 
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'queryschedule', {}
     )
 
@@ -313,7 +321,7 @@ def push_xtview_data(data_type, time, datas):
             numericDatas.append(value)
             types.append(0)
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'pushxtviewdata'
         , {
             'dataType': data_type
@@ -326,3 +334,51 @@ def push_xtview_data(data_type, time, datas):
     )
     return
 
+
+class UIPanel:
+    code = ''
+    period = '1d'
+    figures = []
+    startX = -1
+    startY = -1
+    width = -1
+    height = -1
+
+    def __init__(self, code, period = '1d', figures = [], startX = -1, startY = -1, width = -1, height = -1):
+        self.code = code
+        self.period = period
+        self.figures = figures
+        self.startX = startX
+        self.startY = startY
+        self.width = width
+        self.height = height
+
+
+def apply_ui_panel_control(info: list):
+    '''
+    控制主图界面展示
+    用法：
+    apply_ui_panel_control(info:list[UIPanel])
+
+    参数：
+    info,list[UIPanel]类型,每个UIPanel为一个行情页面,code为必填项
+    code:str,代码市场,为必填项
+    period:str,周期,'tick','1m','5m','1d'等
+    figures:list,内部存放附图指标名称
+    startX: int, 距屏幕左上角横坐标的位置
+    startY: int, 距屏幕左上角纵坐标的位置
+    width: int, 宽度
+    height: int, 高度
+
+    示例：
+    from xtquant import xtview
+    x=xtview.UIPanel('600000.SH','1d', figures=[{'ma': {'n1': 5}}])
+    y=xtview.UIPanel(code='600030.SH',period='1m',startX=-1,startY=-1, width=-1, height=-1)
+    xtview.apply_ui_panel_control([x,y])
+    '''
+    data = []
+    for i in info:
+        data.append(i.__dict__)
+
+    result = _BSON_call_common(get_client().commonControl, 'applyuipanelcontrol', {'data': data})
+    return
