@@ -18,8 +18,9 @@ DB_CONFIG = {
 }
 
 # 全局配置变量
-TABLE_NAME = 'bk_stock_link_202605'  # 目标表名
-FIXED_DATE = '2026-05-15'            # 固定日期
+now = datetime.now()
+TABLE_NAME = f"bk_stock_link_{now.strftime('%Y%m')}"  # 目标表名
+FIXED_DATE = now.strftime('%Y-%m-%d')            # 固定日期
 START_INDEX = 1                      # 从第几个板块开始
 END_INDEX = 128                      # 到第几个板块结束
 

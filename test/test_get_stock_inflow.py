@@ -21,8 +21,9 @@ def save_to_mysql(data_list):
     user = 'root'
     password = 'system'
     database = 'qstock'
-    table_name = 'stock_202605'  # 表名变量
-    fixed_date = '2026-05-15'    # 日期变量
+    now = datetime.now()
+    table_name = f"stock_{now.strftime('%Y%m')}"  # 表名变量
+    fixed_date = now.strftime('%Y-%m-%d')    # 日期变量
     current_page = 1
     end_page = 106 # 初始值，会被第一页请求后的 total/50 覆盖
     st_sn = 1

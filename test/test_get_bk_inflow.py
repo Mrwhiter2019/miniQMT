@@ -20,8 +20,9 @@ def save_to_mysql(data_list):
     user = 'root'
     password = 'system'
     database = 'qstock'
-    date = '2026-05-15'
-    table_name = 'bk_202605'
+    now = datetime.now()
+    date = now.strftime('%Y-%m-%d')
+    table_name = f"bk_{now.strftime('%Y%m')}"
     current_page = 1
     total_pages = 3
     
