@@ -22,6 +22,8 @@ def save_to_mysql(data_list):
     database = 'qstock'
     date = '2026-05-15'
     table_name = 'bk_202605'
+    current_page = 1
+    total_pages = 3
     
     conn = None
     try:
@@ -109,9 +111,6 @@ def get_bk_inflow():
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
-    
-    current_page = 1
-    total_pages = 1
     
     while current_page <= total_pages:
         # 拼接分页参数

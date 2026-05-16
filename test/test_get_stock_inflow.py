@@ -23,6 +23,9 @@ def save_to_mysql(data_list):
     database = 'qstock'
     table_name = 'stock_202605'  # 表名变量
     fixed_date = '2026-05-15'    # 日期变量
+    current_page = 1
+    end_page = 106 # 初始值，会被第一页请求后的 total/50 覆盖
+    st_sn = 1
     
     conn = None
     try:
@@ -126,10 +129,6 @@ def get_stock_inflow():
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"Windows"'
     }
-
-    current_page = 1
-    end_page = 106 # 初始值，会被第一页请求后的 total/50 覆盖
-    st_sn = 1
 
     while current_page <= end_page:
         now = datetime.now()
