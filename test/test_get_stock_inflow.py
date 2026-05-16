@@ -24,9 +24,6 @@ def save_to_mysql(data_list):
     now = datetime.now()
     table_name = f"stock_{now.strftime('%Y%m')}"  # 表名变量
     fixed_date = now.strftime('%Y-%m-%d')    # 日期变量
-    current_page = 1
-    end_page = 106 # 初始值，会被第一页请求后的 total/50 覆盖
-    st_sn = 1
     
     conn = None
     try:
@@ -112,6 +109,9 @@ def get_stock_inflow():
     """
     循环抓取个股资金流向数据，动态生成 cb 和 Cookie，每页间隔5秒。
     """
+    current_page = 1
+    end_page = 106 # 初始值，会被第一页请求后的 total/50 覆盖
+    st_sn = 1
     all_data = []
     base_cookie = "qgqp_b_id=1ff899deb2754493bd78d685f931f0ea; st_nvi=L87pFwNzUoC8jmQBMymBX3765; nid18=08abed9af61161fe18a0aebc4025ba93; nid18_create_time=1775446043644; gviem=fN8QFHLXgu3RqeGuaCrV13e41; gviem_create_time=1775446043644; fullscreengg=1; fullscreengg2=1; st_si=39946881941622; st_asi=delete; wsc_checkuser_ok=1; st_pvi=28182120717568; st_sp=2026-04-06%2011%3A27%3A23; st_inirUrl=https%3A%2F%2Fcn.bing.com%2F;"
     

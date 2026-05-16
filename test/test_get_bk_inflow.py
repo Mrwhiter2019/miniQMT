@@ -23,8 +23,6 @@ def save_to_mysql(data_list):
     now = datetime.now()
     date = now.strftime('%Y-%m-%d')
     table_name = f"bk_{now.strftime('%Y%m')}"
-    current_page = 1
-    total_pages = 3
     
     conn = None
     try:
@@ -99,7 +97,8 @@ def get_bk_inflow():
     支持分页查询，自动抓取所有页面。
     保留原始URL中的cb参数并处理JSONP格式。
     """
-    
+    current_page = 1
+    total_pages = 3
     # 每页条数
     pz = 50
     all_diff_data = []
