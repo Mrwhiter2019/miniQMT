@@ -8,7 +8,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from xtquant import xtdata
+from data_manager import get_data_manager
+import config
 import pandas as pd
 import pymysql
 import json
@@ -41,9 +42,13 @@ def select_stocks_by_change():
     """
     获取今天涨幅在 3% 到 5% 之间的股票
     """
-    # 1. 初始化缓存
+    # 1. 初始化数据管理器
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在连接行情接口...")
-    stock_names_cache = {}
+    dm = get_data_manager()
+    
+    if not dm.xt:
+        print("错误: 无法连接到行情服务，请确保 QMT 客户端已启动并登录。")
+        return
 
     # 2. 获取股票列表
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在获取全市场股票列表...")
@@ -51,13 +56,13 @@ def select_stocks_by_change():
         # 获取沪深A股板块下的所有股票代码
         # 注意: 不同版本的 QMT 可能对板块名称的支持有所不同
         sector_name = '沪深A股'
-        stock_list = xtdata.get_stock_list_in_sector(sector_name)
+        stock_list = dm.xt.get_stock_list_in_sector(sector_name)
         
         # 如果获取不到，尝试兼容性板块名
         if not stock_list:
             print(f"尝试从 '{sector_name}' 获取为空，正在尝试替代板块...")
             for alt_sector in ['沪深主板', 'A股', '上证A股', '深证A股']:
-                alt_list = xtdata.get_stock_list_in_sector(alt_sector)
+                alt_list = dm.xt.get_stock_list_in_sector(alt_sector)
                 if alt_list:
                     print(f"从 '{alt_sector}' 获取到数据")
                     stock_list.extend(alt_list)
@@ -150,10 +155,10 @@ def select_stocks_by_change():
     minutes_passed = get_market_minutes()
     
     # 获取成交量基准 (依然尝试全局获取一次，如果失败则在循环中单独下载)
-    avg_vols = pd.Series(dtype=float)
+    avg_vols = pd.Series()
     try:
         # 尝试获取过去5天的成交量
-        history_vols_data = xtdata.get_market_data(field_list=['volume'], stock_list=stock_list, period='1d', count=5)
+        history_vols_data = dm.xt.get_market_data(field_list=['volume'], stock_list=stock_list, period='1d', count=5)
         if 'volume' in history_vols_data:
             avg_vols = history_vols_data['volume'].mean(axis=1)
     except:
@@ -163,7 +168,7 @@ def select_stocks_by_change():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在获取全市场实时行情...")
 
     try:
-        full_ticks = xtdata.get_full_tick(stock_list)
+        full_ticks = dm.xt.get_full_tick(stock_list)
         if not full_ticks:
             print("未能获取到行情快照，请检查 QMT 状态。")
             return
@@ -191,17 +196,17 @@ def select_stocks_by_change():
             if not (3.0 <= change_pct <= 5.0): continue
 
             # 2. 排除 ST 股
-            name = stock_names_cache.get(code)
+            name = dm.stock_names_cache.get(code)
             if not name:
-                detail = xtdata.get_instrument_detail(code)
+                detail = dm.xt.get_instrument_detail(code)
                 name = detail.get('InstrumentName') or detail.get('instrumentName') or '未知'
-                stock_names_cache[code] = name
+                dm.stock_names_cache[code] = name
             
             if 'ST' in name.upper():
                 continue
 
             # 3. 换手率筛选 [5%-10%]
-            detail = xtdata.get_instrument_detail(code)
+            detail = dm.xt.get_instrument_detail(code)
             float_volume = detail.get('FloatVolume', 0)
             turnover_rate = 0
             if float_volume > 0:
@@ -236,15 +241,15 @@ def select_stocks_by_change():
             hist_closes = []
             try:
                 # 尝试获取
-                h_data = xtdata.get_market_data(field_list=['close'], stock_list=[code], period='1d', count=6)
+                h_data = dm.xt.get_market_data(field_list=['close'], stock_list=[code], period='1d', count=6)
                 if 'close' in h_data and not h_data['close'].empty:
                     hist_closes = h_data['close'].iloc[0].dropna().values
                 
                 # 如果获取不到或不足，执行下载
                 if len(hist_closes) < 5:
-                    xtdata.download_history_data(code, period='1d', start_time='', end_time='')
+                    dm.xt.download_history_data(code, period='1d', start_time='', end_time='')
                     # 重新获取
-                    h_data = xtdata.get_market_data(field_list=['close'], stock_list=[code], period='1d', count=6)
+                    h_data = dm.xt.get_market_data(field_list=['close'], stock_list=[code], period='1d', count=6)
                     if 'close' in h_data and not h_data['close'].empty:
                         hist_closes = h_data['close'].iloc[0].dropna().values
             except:
@@ -334,7 +339,7 @@ def select_stocks_by_change():
     print(f"提示: 当前计算量比使用的分钟数为 {minutes_passed} 分钟。")
     if any(s['vol_ratio'] == 1.01 for s in selected_stocks):
         print("注意: 部分量比显示为 1.01 是因为本地缺少历史成交量数据，已为您默认通过筛选。")
-        print("建议: 您可以使用 xtdata.download_history_data 方法下载全市场历史日线数据以获得准确量比。")
+        print("建议: 您可以使用 DataManager 的 download_history_data 方法下载全市场历史日线数据以获得准确量比。")
 
 if __name__ == "__main__":
     # 执行筛选
