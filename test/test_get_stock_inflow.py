@@ -3,6 +3,7 @@ import time
 import json
 import math
 import re
+import os
 import pymysql
 import random
 from datetime import datetime
@@ -15,12 +16,17 @@ def save_to_mysql(data_list):
         print("最终未获取到任何数据，跳过数据库写入。")
         return
     
-    # 配置信息
-    host = '127.0.0.1'
-    port = 3306
-    user = 'root'
-    password = 'system'
-    database = 'qstock'
+    # 读取配置
+    config_path = os.path.join(os.path.dirname(__file__), 'test_get_config.json')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    db_config = config['db']
+
+    host = db_config['host']
+    port = db_config['port']
+    user = db_config['user']
+    password = db_config['password']
+    database = db_config['database']
     now = datetime.now()
     table_name = f"stock_{now.strftime('%Y%m')}"  # 表名变量
     fixed_date = now.strftime('%Y-%m-%d')    # 日期变量

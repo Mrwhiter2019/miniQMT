@@ -11,6 +11,8 @@ if project_root not in sys.path:
 from data_manager import get_data_manager
 import config
 import pandas as pd
+import pymysql
+import json
 
 def get_market_minutes():
     """获取当日已交易分钟数"""
@@ -68,6 +70,41 @@ def select_stocks_by_change():
             # 去重
             stock_list = list(set(stock_list))
             
+        # 根据 bk_stock_link 表进行过滤
+        if stock_list:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在根据数据库进行股票过滤...")
+            try:
+                config_path = os.path.join(os.path.dirname(__file__), 'test_get_config.json')
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    app_config = json.load(f)
+                db_config = app_config['db']
+                
+                conn = pymysql.connect(**db_config)
+                cursor = conn.cursor()
+                now_dt = datetime.now()
+                table_name = f"bk_stock_link_{now_dt.strftime('%Y%m')}"
+                
+                # 获取最新可用日期，解决当天无数据时过滤为空的问题
+                cursor.execute(f"SELECT MAX(date) FROM {table_name}")
+                max_date_res = cursor.fetchone()
+                if max_date_res and max_date_res[0]:
+                    current_date = max_date_res[0]
+                else:
+                    current_date = now_dt.strftime('%Y-%m-%d')
+                
+                print(f"使用日期 {current_date} 的数据进行过滤...")
+                sql = f"SELECT code FROM {table_name} WHERE date = %s"
+                cursor.execute(sql, (current_date,))
+                rows = cursor.fetchall()
+                allowed_codes = set(row[0] for row in rows)
+                conn.close()
+                
+                filtered_list = [stock for stock in stock_list if stock.split('.')[0] in allowed_codes]
+                print(f"数据库过滤完成: 原有 {len(stock_list)} 只，过滤后剩余 {len(filtered_list)} 只。")
+                stock_list = filtered_list
+            except Exception as e:
+                print(f"数据库过滤出错: {e}")
+
         if not stock_list:
             print("未能获取到任何股票列表。请检查 QMT 客户端是否正常连接。")
             return
@@ -77,28 +114,39 @@ def select_stocks_by_change():
         print(f"获取股票列表失败: {e}")
         return
 
-    # 3. 建立板块/行业映射 (仅申万二级)
+    # 3. 建立板块映射 (从数据库)
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在建立行业板块映射...")
     industry_map = {}
     
     try:
-        all_sectors = dm.xt.get_sector_list()
-        # 切换到申万二级行业 (SW2)
-        target_sectors = [s for s in all_sectors if s.startswith('SW2')]
-        if not target_sectors:
-            # 降级处理: 如果没有 SW2，尝试 SW1 或其他
-            target_sectors = [s for s in all_sectors if s.startswith('SW1') or '行业' in s]
+        config_path = os.path.join(os.path.dirname(__file__), 'test_get_config.json')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            app_config = json.load(f)
+        db_config = app_config['db']
+        
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+        now_dt = datetime.now()
+        table_name = f"bk_stock_link_{now_dt.strftime('%Y%m')}"
+        
+        sql = f"SELECT DISTINCT bkname, code FROM {table_name}"
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # 构建 code 到 bkname 的映射
+        code_to_bk = {}
+        for bkname, code in rows:
+            if code not in code_to_bk:
+                code_to_bk[code] = []
+            code_to_bk[code].append(bkname)
             
-        for sector in target_sectors:
-            stocks = dm.xt.get_stock_list_in_sector(sector)
-            # 提取名称
-            name = sector
-            if sector.startswith(('SW1', 'SW2')): name = sector[3:]
-            elif ' ' in sector: name = sector.split(' ', 1)[1]
-            
-            for s in stocks:
-                if s not in industry_map:
-                    industry_map[s] = name
+        # 根据 stock_list 构建最终的 industry_map
+        for stock in stock_list:
+            base_code = stock.split('.')[0]
+            if base_code in code_to_bk:
+                industry_map[stock] = ",".join(code_to_bk[base_code])
+                
     except Exception as e:
         print(f"建立板块映射失败: {e}")
 
@@ -173,6 +221,9 @@ def select_stocks_by_change():
             
             # 5. 量比筛选 > 1
             avg_daily_vol = avg_vols.get(code, 0)
+            if pd.isna(avg_daily_vol):
+                avg_daily_vol = 0
+                
             vol_ratio = 0
             if avg_daily_vol > 0 and minutes_passed > 0:
                 vol_ratio = (volume / minutes_passed) / (avg_daily_vol / 240)

@@ -3,46 +3,49 @@ import time
 import json
 import math
 import re
+import os
 import pymysql
 import random
 from datetime import datetime
 
+# 读取配置
+config_path = os.path.join(os.path.dirname(__file__), 'test_get_config.json')
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
 # 数据库配置信息
-DB_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 3306,
-    'user': 'root',
-    'password': 'system',
-    'database': 'qstock',
-    'charset': 'utf8mb4'
-}
+DB_CONFIG = config['db']
 
 # 全局配置变量
 now = datetime.now()
 TABLE_NAME = f"bk_stock_link_{now.strftime('%Y%m')}"  # 目标表名
 FIXED_DATE = now.strftime('%Y-%m-%d')            # 固定日期
-START_INDEX = 1                      # 从第几个板块开始
-END_INDEX = 128                      # 到第几个板块结束
+START_INDEX = config['bk_stock']['start_index']                      # 从第几个板块开始
+END_INDEX = config['bk_stock']['end_index']                      # 到第几个板块结束
 
 def get_config_url(bk_name):
     """
-    从 config 表获取板块个股数据的接口地址。
-    SQL: select value from config where name = '{bk_name}' and type = 1
+    根据板块名称，动态拼接板块个股数据的接口地址。
+    SQL: select code from bk_{YYYYMM} where name = '{bk_name}'
     """
     conn = None
+    bk_table = f"bk_{now.strftime('%Y%m')}"
     try:
         conn = pymysql.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        sql = "SELECT value FROM config WHERE name = %s AND type = 1"
+        sql = f"SELECT code FROM {bk_table} WHERE name = %s"
         cursor.execute(sql, (bk_name,))
         result = cursor.fetchone()
         if result:
-            return result[0]
+            bk_code = result[0]
+            fs_param = f"b%3A{bk_code}"
+            url = f"https://push2.eastmoney.com/api/qt/clist/get?cb=jQuery1123004513968553373637_1778895989344&fid=f62&po=1&pz=50&pn=1&np=1&fltt=2&invt=2&ut=8dec03ba335b81bf4ebdf7b29ec27d15&fs={fs_param}&fields=f12%2Cf14%2Cf2%2Cf3%2Cf62%2Cf184%2Cf66%2Cf69%2Cf72%2Cf75%2Cf78%2Cf81%2Cf84%2Cf87%2Cf204%2Cf205%2Cf124%2Cf1%2Cf13"
+            return url
         else:
-            print(f"警告：未在 config 表中找到板块 [{bk_name}] 的接口配置。")
+            print(f"警告：未在 {bk_table} 表中找到板块 [{bk_name}] 的记录。")
             return None
     except Exception as e:
-        print(f"查询 config 表时发生错误 ({bk_name}): {e}")
+        print(f"查询 {bk_table} 表时发生错误 ({bk_name}): {e}")
         return None
     finally:
         if conn:
@@ -62,6 +65,15 @@ def save_to_mysql(data_list, bk_name):
         conn = pymysql.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
+        # 插入前先删除当前日期和板块的数据
+        try:
+            delete_sql = f"DELETE FROM {TABLE_NAME} WHERE date = %s AND bkname = %s"
+            cursor.execute(delete_sql, (FIXED_DATE, bk_name))
+            conn.commit()
+            print(f"已清理表 {TABLE_NAME} 中日期为 {FIXED_DATE} 且板块为 [{bk_name}] 的历史数据。")
+        except Exception as e:
+            print(f"清理历史数据时发生错误: {e}")
+            
         records = []
         for i, row in enumerate(data_list):
             # 格式化金额字段：除以10000，保留2位小数，拼接“万”

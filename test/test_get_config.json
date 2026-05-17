@@ -1,0 +1,14 @@
+{
+    "db": {
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "root",
+        "password": "system",
+        "database": "qstock",
+        "charset": "utf8mb4"
+    },
+    "bk_stock": {
+        "start_index": 1,
+        "end_index": 5
+    }
+}

@@ -1,6 +1,7 @@
 import requests
 import math
 import time
+import os
 import json
 import re
 import pymysql
@@ -14,12 +15,17 @@ def save_to_mysql(data_list):
         print("数据为空，跳过数据库写入。")
         return
     
-    # 数据库连接信息 (已更新为本地连接)
-    host = '127.0.0.1'
-    port = 3306
-    user = 'root'
-    password = 'system'
-    database = 'qstock'
+    # 读取配置
+    config_path = os.path.join(os.path.dirname(__file__), 'test_get_config.json')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    db_config = config['db']
+    
+    host = db_config['host']
+    port = db_config['port']
+    user = db_config['user']
+    password = db_config['password']
+    database = db_config['database']
     now = datetime.now()
     date = now.strftime('%Y-%m-%d')
     table_name = f"bk_{now.strftime('%Y%m')}"
@@ -36,6 +42,14 @@ def save_to_mysql(data_list):
         )
         cursor = conn.cursor()
         
+        # 先删除同一天的数据
+        try:
+            cursor.execute(f"DELETE FROM {table_name} WHERE date = %s", (date))
+            conn.commit()
+            print(f"已清理表 {table_name} 中日期为 {date} 的历史数据。")
+        except Exception as e:
+            print(f"清理表 {table_name} 历史数据时发生错误: {e}")
+
         # 准备批量插入的数据
         records = []
         for i, row in enumerate(data_list):
@@ -55,6 +69,7 @@ def save_to_mysql(data_list):
             # 构造插入记录 (字段顺序需与 SQL 对应)
             record = (
                 str(i + 1),                      # no: 排名，从1开始
+                row.get('f12'),                  # code: 代码
                 row.get('f14'),                  # name: 名称
                 format_percent(row.get('f3')),   # zdf: 涨跌幅
                 format_je(row.get('f62')),       # zl_je: 今日主力净流入_净额
@@ -74,10 +89,10 @@ def save_to_mysql(data_list):
         # 插入语句
         sql = f"""
         INSERT INTO {table_name} (
-            `no`, `name`, `zdf`, `zl_je`, `zl_jzb`, 
+            `no`, `code`, `name`, `zdf`, `zl_je`, `zl_jzb`, 
             `cdd_je`, `cdd_jzb`, `dd_je`, `dd_jzb`, 
             `zd_je`, `zd_jzb`, `xd_je`, `xd_jzb`, `date`
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         # 执行批量插入
